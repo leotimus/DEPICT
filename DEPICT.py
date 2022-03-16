@@ -21,7 +21,8 @@ def use_least_loaded_gpu(least_loaded=None):
         os.environ["THEANO_FLAGS"] = "device=cuda" + str(least_loaded)
 
 
-use_least_loaded_gpu()
+#use_least_loaded_gpu()
+os.environ["THEANO_FLAGS"] = "device=cpu,floatX=float64"
 
 import argparse
 from functions import *
@@ -32,12 +33,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--seed', default=42)
 parser.add_argument('--dataset', default='USPS')
 parser.add_argument('--continue_training', action='store_true', default=False)
-parser.add_argument('--datasets_path', default='/datasets/')
+parser.add_argument('--datasets_path', default='datasets/')
 parser.add_argument('--feature_map_sizes', default=[50, 50, 10])
 parser.add_argument('--dropouts', default=[0.1, 0.1, 0.0])
 parser.add_argument('--batch_size', default=100)
 parser.add_argument('--learning_rate', type=float, default=1e-4)
-parser.add_argument('--num_epochs', default=4000)
+parser.add_argument('--num_epochs', default=10)
 parser.add_argument('--reconstruct_hyperparam', default=1.)
 parser.add_argument('--cluster_hyperparam', default=1.)
 
@@ -98,15 +99,19 @@ encoder, decoder, loss_recons, loss_recons_clean = build_depict(input_var, n_in=
 ############################## Pre-train DEPICT Model   ##############################
 print("\n...Start AutoEncoder training...")
 initial_time = timeit.default_timer()
+
+print("\n...Doing train_depict_ae...")
 train_depict_ae(dataset, X, y, input_var, decoder, encoder, loss_recons, loss_recons_clean, num_clusters, output_path,
                 batch_size=batch_size, test_batch_size=test_batch_size, num_epochs=num_epochs, learning_rate=learning_rate,
                 verbose=verbose, seed=seed, continue_training=args.continue_training)
 
 ############################## Clustering Pre-trained DEPICT Features  ##############################
+print("\n...Doing clustering...")
 y_pred, centroids = clustering(dataset, X, y, input_var, encoder, num_clusters, output_path,
                                test_batch_size=test_batch_size, seed=seed, continue_training=args.continue_training)
 
 ############################## Train DEPICT Model  ##############################
+print("\n...Doing train_depict...")
 train_depict(dataset, X, y, input_var, decoder, encoder, loss_recons, num_clusters, y_pred, output_path,
              batch_size=batch_size, test_batch_size=test_batch_size, num_epochs=num_epochs,
              learning_rate=learning_rate, rec_mult=reconstruct_hyperparam, clus_mult=cluster_hyperparam,

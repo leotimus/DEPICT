@@ -451,9 +451,9 @@ def kmeans(encoder_val_clean, y, nClusters, y_pred_prev=None, weight_initilizati
 
 def load_dataset(dataset_path):
     hf = h5py.File(dataset_path + '/data.h5', 'r')
-    X = np.asarray(hf.get('data'), dtype='float32')
-    X_train = (X - np.float32(127.5)) / np.float32(127.5)
-    y_train = np.asarray(hf.get('labels'), dtype='int32')
+    X = np.asarray(hf.get('data'), dtype='float64')
+    X_train = (X - np.float64(127.5)) / np.float64(127.5)
+    y_train = np.asarray(hf.get('labels'), dtype='int64')
     return X_train, y_train
 
 
@@ -560,8 +560,8 @@ def train_depict_ae(dataset, X, y, input_var, decoder, encoder, loss_recons, los
     learning_rate_shared = theano.shared(lasagne.utils.floatX(learning_rate))
     params = lasagne.layers.get_all_params(decoder, trainable=True)
     updates = lasagne.updates.adam(loss_recons, params, learning_rate=learning_rate_shared)
-    train_fn = theano.function([input_var], loss_recons, updates=updates)
-    val_fn = theano.function([input_var], loss_recons_clean)
+    train_fn = theano.function([input_var], loss_recons, updates=updates, allow_input_downcast=True)
+    val_fn = theano.function([input_var], loss_recons_clean, allow_input_downcast=True)
     X_train, X_val, y_train, y_val = train_test_split(
         X, y, stratify=y, test_size=0.10, random_state=42)
     best_val = np.inf
@@ -577,7 +577,7 @@ def train_depict_ae(dataset, X, y, input_var, decoder, encoder, loss_recons, los
         # TRAIN MODEL
         if verbose > 1:
             encoder_clean = lasagne.layers.get_output(encoder, deterministic=True)
-            encoder_clean_function = theano.function([input_var], encoder_clean)
+            encoder_clean_function = theano.function([input_var], encoder_clean, allow_input_downcast=True)
 
         for epoch in range(num_epochs + 1):
             train_err = 0
@@ -589,7 +589,7 @@ def train_depict_ae(dataset, X, y, input_var, decoder, encoder, loss_recons, los
                 train_err += train_fn(inputs)
                 num_batches += 1
 
-            validation_error = np.float32(val_fn(X_val))
+            validation_error = np.float64(val_fn(X_val))
 
             print("Epoch {} of {}".format(epoch + 1, num_epochs),
                   "\t  training loss:{:.6f}".format(train_err / num_batches),
@@ -633,7 +633,7 @@ def train_depict_ae(dataset, X, y, input_var, decoder, encoder, loss_recons, los
 def clustering(dataset, X, y, input_var, encoder, num_clusters, output_path, test_batch_size=100, seed=42,
                continue_training=False):
     encoder_clean = lasagne.layers.get_output(encoder, deterministic=True)
-    encoder_clean_function = theano.function([input_var], encoder_clean)
+    encoder_clean_function = theano.function([input_var], encoder_clean, allow_input_downcast=True)
 
     # Extract MdA features
     minibatch_flag = 1
@@ -689,7 +689,7 @@ def clustering(dataset, X, y, input_var, encoder, num_clusters, output_path, tes
         centroids = centroids_acpic.T
         centroids = centroids_acpic / np.sqrt(np.diag(np.matmul(centroids.T, centroids)))
 
-    return np.int32(y_pred), np.float32(centroids)
+    return np.int64(y_pred), np.float64(centroids)
 
 
 def train_depict(dataset, X, y, input_var, decoder, encoder, loss_recons, num_clusters, y_pred, output_path,
@@ -732,16 +732,16 @@ def train_depict(dataset, X, y, input_var, decoder, encoder, loss_recons, num_cl
     updates = lasagne.updates.adam(
         loss, params2, learning_rate=learning_rate)
     train_fn = theano.function([input_var, target_var],
-                               [loss, loss_recons, loss_clus], updates=updates)
+                               [loss, loss_recons, loss_clus], updates=updates, allow_input_downcast=True)
 
     loss_clus_init = clus_lambda * loss_clus_init
     loss_init = loss_clus_init + loss_recons
     updates_init = lasagne.updates.adam(
         loss_init, params_init, learning_rate=learning_rate)
     train_fn_init = theano.function([input_var, target_init],
-                                    [loss_init, loss_recons, loss_clus_init], updates=updates_init)
+                                    [loss_init, loss_recons, loss_clus_init], updates=updates_init, allow_input_downcast=True)
 
-    test_fn = theano.function([input_var], network_prediction_clean)
+    test_fn = theano.function([input_var], network_prediction_clean, allow_input_downcast=True)
     final_time = timeit.default_timer()
 
     print("\n...Start DEPICT initialization")
@@ -771,7 +771,7 @@ def train_depict(dataset, X, y, input_var, decoder, encoder, loss_recons, num_cl
                 num_batches_train = 0
                 for batch in iterate_minibatches(X_train, y_train, batch_size, shuffle=True):
                     minibatch_inputs, targets, idx = batch
-                    minibatch_error, lossrec, losspred = train_fn_init(minibatch_inputs, np.int32(y_targ_train[idx]))
+                    minibatch_error, lossrec, losspred = train_fn_init(minibatch_inputs, np.int64(y_targ_train[idx]))
                     train_err += minibatch_error
                     lossre_train += lossrec
                     losspre_train += losspred
@@ -850,12 +850,12 @@ def train_depict(dataset, X, y, input_var, decoder, encoder, loss_recons, num_cl
                 # M_step
                 if prediction_status == 'hard':
                     minibatch_err, lossrec, losspred = train_fn(minibatch_inputs,
-                                                                np.ndarray.astype(y_pred[idx], 'int32'),
+                                                                np.ndarray.astype(y_pred[idx], 'int64'),
                                                                 np.ndarray.astype(y_prob_max[idx],
-                                                                                  'float32'))
+                                                                                  'float64'))
                 elif prediction_status == 'soft':
                     minibatch_err, lossrec, losspred = train_fn(minibatch_inputs,
-                                                                np.ndarray.astype(y_prob[idx], 'float32'))
+                                                                np.ndarray.astype(y_prob[idx], 'float64'))
 
                 minibatch_prob = test_fn(minibatch_inputs)
                 y_prob[idx] = minibatch_prob

@@ -1,11 +1,11 @@
 [global]
 cxx=/usr/bin/g++-5
 cc=/usr/bin/gcc-5
-device=cuda1
+device=cpu
 optimizer_excluding=low_memory
 allow_gc=False
-floatX=float32
-root=/usr/local/cuda-8.0
+floatX=float64
+root=/usr/local/cuda
 [dnn.conv]
 algo_fwd = time_once
 algo_bwd_data = time_once
